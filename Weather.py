@@ -2,6 +2,9 @@
 import requests
 from geopy.geocoders import Nominatim
 from datetime import datetime
+from sys import exit
+from sys import argv
+from os import path
 
 
 def precision_four(func):
@@ -9,19 +12,23 @@ def precision_four(func):
         return round(func(arg1, arg2), 4)
     return wrapper
 
-def get_location():
-    is_config_file = True
-    try:
-        iFile = open('.weatherconfig')
-    except IOError:
-        print('No ".weatherconfig" file detected.')
-        is_config_file = False
-    finally:
-        if is_config_file:
-            input_location = iFile.read().strip()
-            iFile.close()
-        else:
-            input_location = input(
+
+def get_location(program_directory):
+    if len(argv) > 1:
+        input_location = ' '.join(argv[1:])
+    else:
+        is_config_file = True
+        try:
+            iFile = open(f'{program_directory}/.weatherconfig')
+        except IOError:
+            print('No ".weatherconfig" file detected.')
+            is_config_file = False
+        finally:
+            if is_config_file:
+                input_location = iFile.read().strip()
+                iFile.close()
+            else:
+                input_location = input(
                     "For which location would you like weather information?\n")
     return input_location
 
@@ -53,7 +60,8 @@ def get_longitude(geolocator, input_location):
 
 
 API_URL = "http://api.weather.gov"  # location of api
-input_location = get_location()
+program_directory = path.dirname(path.realpath(argv[0]))
+input_location = get_location(program_directory)
 print(f'Retrieving weather information for {input_location}...')
 
 # Get latitude and Longitude of input_location
@@ -61,8 +69,14 @@ geolocator = Nominatim(user_agent="app")  # Set app name for Nominatim
 latitude = get_latitude(geolocator, input_location)
 longitude = get_longitude(geolocator, input_location)
 
-forecast_office = requests.get(
+try:
+    forecast_office = requests.get(
         f"{API_URL}/points/{latitude},{longitude}").json()['properties']
+except KeyError:
+    print('Location not found. Please try a different location name')
+    print('If the format "City, ST" does not yield results, Try ' +
+          '"City, County, ST".')
+    exit()
 
 forecast = requests.get(
         forecast_office['forecast']).json()['properties']['periods']
@@ -83,4 +97,4 @@ print(f"Data retrieved from a weather station located in {city}, {state}.")
 print(f"The forecast for {time_of_day} is as follows:")
 print(forecast[1]['detailedForecast'])
 print(f"At {formatted_time}, the temperature will be " +
-       f"{temperature}\u00b0{temp_unit}.")
+      f"{temperature}\u00b0{temp_unit}.")
